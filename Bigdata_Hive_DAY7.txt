@@ -1,0 +1,76 @@
+5) Hive
+	1) 하둡 기반에서 실행되는 라이브러리
+	2) Java 코드 대신 SQL구문 사용 (HiveQL)
+		- hive2 까지만 사용 가능
+	3) 설치
+		- http://hive.apache.org
+		- http://mirror.apache-kr.org/hive/hive-2.3.7/ 다운로드 
+		- tar zxvf 하이브 파일명 > 압축풀이 
+		- mv apache-hive-2.3.7-bin hive2  > 이름 변경
+		- rm apache-hive-2.3.7-bin.tar.gz  > 압축파일 삭제
+		- mysql 준비 
+		- 환경변수에 추가 
+			gedit /etc/profile
+			-----------------------------
+			export HIVE_HOME=/root/hive2
+			export PATH=$PATH:$HIVE_HOME/bin
+
+			source /etc/profile 
+			stop-dfs.sh
+			stop-yarn.sh
+			reboot
+
+			start-dfs.sh
+			start-yarn.sh
+			hive 실행
+			quit;  > hive종료
+			안되면 safemode 빠저나오기 hdfs dfsadmin -safemode leave
+
+		- mysql connection 파일을 hive2/lib에 복사 (WinSCP사용)
+		- hive2/conf로 이동
+			gedit hive-site.xml
+			---------------
+			<configuration>
+				<property>
+					<name>hive.metastore.local</name>
+					<value>true</value>
+				</property>
+				<property>
+					<name>javax.jdo.option.ConnectionURL</name>
+					<value>jdbc:mysql://자신의 IP입력:3306/hive?useSSL=false&amp;createDatabaseIfNotExist=true&amp;serverTimezone=UTC&amp;allowPublickeyRetireval=true</value>
+				</property>
+				<property>
+					<name>javax.jdo.option.ConnectionDriverName</name>
+					<value>com.mysql.jdbc.Driver</value>
+				</property>
+				<property>
+					<name>javax.jdo.option.ConnectionUserName</name>
+					<value>hive</value> 
+				</property>
+				<property>
+					<name>javax.jdo.option.ConnectionPassword</name>
+					<value>hive</value>
+				</property>
+			</configuration>
+		- mysql 
+			- 계정 생성 
+				create user hive@localhost identified by'hive';
+				//grant all privileges on hive.* to hive@localhost
+				grant all privileges on *.* to 'hive'@% identified by 'hive'  > 만약 모든 권한이 부여 되지 않았을 경우 
+				flush privilieges
+
+			- DB생성 : create database hive;
+
+		- 윈도우 방화벽 포트 개방  
+			제어판 > 시스템 및 보안 > Windows Defender 방화벽 >고급설정 >인바운드 규칙 
+			> 새규칙 (포트 개방 / TCP / 특정 로컬포트 : 3306(기본설정) / 연결 허용 /도메인,개인,공용/이름 : mysql)
+
+	4) MetaStore 초기화 작업
+		hive로 DB접속
+		schematool -initSchema -dbType mysql 
+		완료 후 hive DB에서 테이블 생성 확인 . 
+			use hive;
+			show tables;
+
+
+		
