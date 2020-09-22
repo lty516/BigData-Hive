@@ -1,0 +1,106 @@
+	5) hdfs에 하이브 작업공간 설정 
+		hdfs dfs -ls -R /
+		
+		hdfs dfs -mkdir /user
+		hdfs dfs -mkdir /user/hive
+		hdfs dfs -mkdir /user/hive/warehouse
+		
+		hdfs dfs -ls /tmp 
+		hdfs dfs -chmod g+x /tmp <실행 권한 설정>
+		hdfs dfs -chmod g+x /user/hive
+		hdfs dfs -chmod g+x /user/hive/warehouse 
+		
+		hive
+	6) hive에 저장할 데이터 준비 
+		-emp.csv, dept.csv, salgrade 3개의 파일을 리눅스에 전송 
+		-hive에 테이블 3개 준비 
+			create table dept(
+				dname string,
+				loc string,
+				deptno int
+			) row format delimited fields terminated by ',';
+
+			create table emp(
+				empno int,
+				ename string,
+				job string,
+				mgr int,
+				hiredate string,
+				sal int,
+				comm int,
+				deptno int
+			) row format delimited fields terminated by ',';
+
+			create table salgrade(
+				grade int,
+				losal int,
+				hisal int
+			) row format delimited fields terminated by ',';
+			
+			show tables
+		- 3개의 csv파일을 하이브 테이블로 로드 
+			load data local inpath '/root/source/emp.cvs' overwrite into table emp;
+			load data local inpath '/root/source/dept.cvs' overwrite into table dept;
+			load data local inpath '/root/source/salgrade.cvs' overwrite into table salgrade;
+
+			select * from emp;
+			select * from dept;
+			select * from salgrade;
+			
+			select d.deptno, d.dname, e.ename, e.sal from emp e, dept d
+			where e.dept = d.deptno;
+			select d.deptno, d.dname, e.ename, e.sal from emp e, dept d
+			where e.dept = d.deptno and e.job like '%CLERK%';
+			select deptno, count(*) cnt, sum(sal) sum_sal, avg(sal) avg_sal from emp
+			group by deptno order by deptno;
+
+		- 항공운항 데이터로 실습 
+			create table ontime( year int, month int, dayofmonth int, 
+			dayofweek int, deptime int, crsdeptime int, 
+			arrtime int, crsarrtime int, uniquecarrier string, 
+			flightnum int, tailnum string, actualelapsedtime int, 
+			crselapsedtime int, airtime int, arrdelay int, 
+			depdelay int, origin string, dest string, 
+			distance int, taxiin int, taxiout int, 
+			cancelled int, cancellationcode string, deverted int, 
+			carrierdelay string, weatherdelay string, nasdelay string, 
+			securitydelay string, lateaircraftdelay string) 
+			partitioned by (delayyear int) 
+			row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+		- 리눅스에 있는 airline 데이터에서 각 파일의 첫번째 줄을 삭제 
+			cd /root/source/airline
+			
+			sed -e '1d' 2006.csv > 2006_new.csv
+			sed -e '1d' 2007.csv > 2007_new.csv
+			sed -e '1d' 2008.csv > 2008_new.csv
+		- 3개의 파일을 hive 테이블로 로드 (만약 리눅스에 자료가 있다면 local생략가능)
+			load data local inpath '/root/source/airline/2006_new.csv' overwrite into table ontime partition(delayyear = '2006');
+			load data local inpath '/root/source/airline/2007_new.csv' overwrite into table ontime partition(delayyear = '2007');
+			load data local inpath '/root/source/airline/2008_new.csv' overwrite into table ontime partition(delayyear = '2008'); 
+			
+			select * from ontime limit 10;
+			select count(*) from ontime;
+
+		- 출발 지연 건수
+			select year, month, count(*) from ontime;
+			where depdelay>0 group by year, month order by year, month;
+		- 파일 목록 확인(리눅스에서 작업)
+			hdfs -dfs -ls /user/hive/warehouse/ontime
+			hdfs -dfs -ls /user/hive/warehouse/ontime/delayyear=2006
+		- 도착 지연 건수 
+			select year, month, count(*) from ontime
+			where arrdelay > 0 group by year, month order by year, month;
+		- 조인 실습 
+			> 데이터 다운 http://stat-computing.org/dataexpo/2009/supplemental-data.html 
+				> Supplemental data/airports.csv,carriers.csv 
+
+			airports.csv, carriers.csv를 리눅스(master)의 airline 폴더에 업로드한다. 
+
+			데이터 전처리 : carriers.csv 파일의 항공사 코드에서 ""제거 
+			
+			find . -name carriers.csv -exec perl -p -i -e 's/"//g';
+
+			cat carriers.csv
+
+			create table carrier_code(
+				
