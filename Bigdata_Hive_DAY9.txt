@@ -1,0 +1,111 @@
+	7) hive의 실행결과 저장하기 
+		create table ontime_depdelay(
+			year int,
+			month int,
+			count int
+		);
+
+		show table;
+		
+		insert overwrite table ontime_depdelay
+		select year, month, count(*) from ontime
+		where depdelay>0 group by year, month order by year, month;
+		
+		select * from ontime_depdelay limit 20;
+
+		- hdfs에 저장
+			insert overwrite directory '/tmp/airport_result'
+			select * from ontime_depdelay;
+			
+			hdfs dfs -ls /tmp/airport_result
+			hdfs dfs -cat /tmp/airport_result/000000_0
+
+	8) Bucket 활용 
+		hdfs dfs -ls /uesr/hive/warehouse/ontime
+		hdfs dfs -ls /uesr/hive/warehouse/ontime/delayyear=2006
+	
+		- uniquecarrier를 이용해서 파일을 20개로 나누도록 하자.
+		create table ontime2(
+			year int,
+			mont int,
+			uniquecarrier string,
+			arrdelay int,
+			dedelay int
+		) clustered by (uniquecarrier) into 20 buckets;
+
+		insert overwrite table ontime2
+		select year, month, uniquecarrier, arrdelay, dedelay from ontime;
+
+		hdfs dfs -ls /user/hive/warehouse/ontime2
+		
+		- 첫번째 버킷에서 샘플 조회
+		select uniquecarrier, count(*) from ontime2
+		tablesample(bucket 1 out of 20)group by uniquecarrier;
+
+(6) Pig
+	1) 다운로드 및 세팅
+		http://pig.apache.org
+			> http://apache.tt.co.kr/pig/pig-0.17.0/ > tar.gz 버전 다운
+		- 압축 풀기 : tar zxvf pig-0.17.0.tar.gz
+		- 폴더명 pig017로 변경하고 기존 압축파일 삭제
+			mv pig-0.17.0 pig017
+			rm pig-0.17.0.tar.gz
+		- 환경변수 설정
+			gedit /etc/profile
+			-------------------------
+			export PIG_HOME=/root/pig017
+			export PATH=$PATH:$PIG_HOME/bin
+			--------------------------
+			source /etc/profile
+			stop-dfs.sh
+			stop-yarn.sh
+			reboot
+			
+			start-dfs.sh
+			start-yarn.sh
+			pig 	
+
+	2) JobHistoryServer 실행
+		mr-jobhistory-daemon.sh start historyserver
+		jps
+	3) 실습 1: DUMP, STORE
+		- 실습 데이터 
+			cat /etc/passwd
+			cp /etc/passwd /root/source/passwd
+		- 실습 데이터를 hdfs로 업로드 
+			hdfs dfs -put /root/source/passed /upload
+			hdfs dfs-ls /upload
+		- pig에서 작업 
+			A = LOAD '/upload/passwd' using PigStorage(':')
+			DUMP A;
+			
+			B = FOREACH A GENERATE $0 AS id;
+			DUMP B;
+			
+			STORE B INTO '/upload/pig_output/passwd';
+
+			hdfs dfs -ls /upload/pig_output/passwd
+			hdfs dfs -cat /upload/pig_output/passwd/part-m-00000
+	4) 실습2 : wordcount
+		- 샘플데이터 hdfs로 전송
+			hdfs dfs -put $HADOOP_HOME/README.txt /upload
+
+		- 맵리듀스 모드로 pig 실행
+			pig -x mapreduve
+			pig -x local
+		- 샘플 데이터를 A변수에 로드
+			A = LOAD '/upload/README.txt';
+			
+			B = FOREACH A GENERATE FLATTEN(TOKENUZE((chararray)$0) AS word;
+			DUMP B;
+				
+			C = GROUP B BY word;
+
+			D = FOREACH C GENERATE group AS word, COUNT($1) AS count;
+			
+			STORE E INTO '/upload/pig_output/readme
+
+		- hdfs 에서 확인
+			hdfs dfs -ls /upload/pig_output/readme
+			hdfs dfs -cat /upload/pig_output/part-r-0000quit
+			

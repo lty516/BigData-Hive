@@ -98,9 +98,25 @@
 
 			데이터 전처리 : carriers.csv 파일의 항공사 코드에서 ""제거 
 			
-			find . -name carriers.csv -exec perl -p -i -e 's/"//g';
+			find .v -exec perl -p -i -e 's/"//g' {} \;
 
 			cat carriers.csv
 
 			create table carrier_code(
+				code string,
+				description string
+			) row format delimited fields terminated by ',' lines terminated by '\n' stored as textfile;
+
+			show tables;
+
+			load data local inpath '/root/source/airline/carriers.csv'
+			overwrite into table carrier_code;
+
+			select a.year, a.uniquecarrier, c.description, count(*)
+			from ontime a join carrier_code c
+			on a.uniquecarrier=c.code
+			where  a.arrdelay > 0
+			group by a.year, a.uniquecarrier, c.description
+			order by a.year, a.uniquecarrier, c.description;
+	
 				
